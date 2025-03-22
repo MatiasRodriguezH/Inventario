@@ -2,14 +2,14 @@ import sys
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, 
     QHBoxLayout, QTableWidget, QTableWidgetItem, QSizePolicy, 
-    QHeaderView, QStackedLayout, QLabel, QLineEdit, QMessageBox, QInputDialog
+    QHeaderView, QStackedLayout, QLabel, QLineEdit, QMessageBox, QInputDialog, QFormLayout
 )
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
 
 class Botones(QWidget):
     """Clase del Layout de botones principales"""
-    def __init__(self, stack_layout):
+    def __init__(self, stack_layout, usuario):
         super().__init__()
         self.stack_layout = stack_layout
 
@@ -22,7 +22,7 @@ class Botones(QWidget):
         self.boton_inventario.setStyleSheet("background-color: yellow; color: black;")
         self.boton_inventario.clicked.connect(lambda: self.stack_layout.setCurrentIndex(0))
 
-        self.boton_ganancias = QPushButton("Ganancias")
+        self.boton_ganancias = QPushButton(f"{usuario}")
         self.boton_ganancias.setStyleSheet("background-color: pink; color: black;")
 
         # Ajustar fuente y hacer los botones responsivos
@@ -46,9 +46,9 @@ class Botones(QWidget):
 
 class Inventario(QWidget):
     """Clase del Layout del inventario"""
-    def __init__(self, tabla):
+    def __init__(self, tabla, usuario):
         super().__init__()
-
+        self.usuario = usuario
         # Layout principal (vertical)
         self.layout_inventario = QVBoxLayout()
         self.layout_inventario.setContentsMargins(25, 25, 25, 25)
@@ -105,40 +105,50 @@ class Inventario(QWidget):
 
     def mostrar_agregar_producto(self):
         """Crear la ventana de agregar producto"""
-        self.agregar_producto = AgregarProducto(self.tabla)
-        self.agregar_producto.setWindowTitle("Agregar Producto")
-        self.agregar_producto.show()
+        if self.usuario == "admn":
+            self.agregar_producto = AgregarProducto(self.tabla)
+            self.agregar_producto.setWindowTitle("Agregar Producto")
+            self.agregar_producto.show()
+        else:
+            QMessageBox.warning(self, "Error", "Permiso denegado")
 
     def eliminar_producto(self):
         """Eliminar el producto seleccionado de la tabla y del archivo, con confirmación"""
-        row = self.tabla.table.currentRow()
-        if row != -1:  # Se tiene que elegir una fila
-            respuesta = QMessageBox.question(self, 'Confirmación', 
-                                            '¿Estás seguro de que quieres eliminar este producto?',
-                                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if self.usuario == "admn":
+            row = self.tabla.table.currentRow()
+            if row != -1:  # Se tiene que elegir una fila
+                respuesta = QMessageBox.question(self, 'Confirmación', 
+                                                '¿Estás seguro de que quieres eliminar este producto?',
+                                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-            if respuesta == QMessageBox.StandardButton.Yes:
-                del self.tabla.products[row]
-                self.tabla.table.removeRow(row)
-                self.tabla.guardarArchivos()
-                self.tabla.actualizarTabla()
-                print("Producto eliminado correctamente.")
+                if respuesta == QMessageBox.StandardButton.Yes:
+                    del self.tabla.products[row]
+                    self.tabla.table.removeRow(row)
+                    self.tabla.guardarArchivos()
+                    self.tabla.actualizarTabla()
+                    print("Producto eliminado correctamente.")
+                else:
+                    print("Eliminación cancelada.")
             else:
-                print("Eliminación cancelada.")
+                print("No se ha seleccionado ningún producto.")
         else:
-            print("No se ha seleccionado ningún producto.")
+            QMessageBox.warning(self, "Error", "Permiso denegado")
 
     def mostrar_modificar_producto(self):
+        #print(self.usuario)
         """Abrir ventana para modificar el producto seleccionado"""
-        row = self.tabla.table.currentRow()
-        if row != -1:  # Se tiene que elegir una fila
-            producto = self.tabla.products[row]
-            # Ventana con los datos del producto
-            self.modificar_producto = ModificarProducto(self.tabla, row, producto)
-            self.modificar_producto.setWindowTitle("Modificar Producto")
-            self.modificar_producto.show()
+        if self.usuario == "admn":
+            row = self.tabla.table.currentRow()
+            if row != -1:  # Se tiene que elegir una fila
+                producto = self.tabla.products[row]
+                # Ventana con los datos del producto
+                self.modificar_producto = ModificarProducto(self.tabla, row, producto)
+                self.modificar_producto.setWindowTitle("Modificar Producto")
+                self.modificar_producto.show()
+            else:
+                QMessageBox.warning(self, "Error", "Selecciona un producto para modificar.")
         else:
-            QMessageBox.warning(self, "Error", "Selecciona un producto para modificar.")
+            QMessageBox.warning(self, "Error", "Permiso denegado")
 
 class Tabla(QWidget):
     """Clase para la tabla de inventario"""
@@ -270,7 +280,7 @@ class AgregarProducto(QWidget):
 
 
 class ModificarProducto(QWidget):
-    """Clase para el boton modificar"""
+    """Clase para modificar un producto en la tabla."""
     def __init__(self, tabla, row, producto):
         super().__init__()
 
@@ -278,28 +288,38 @@ class ModificarProducto(QWidget):
         self.row = row
         self.producto = producto
 
-        # Layout para la pantalla de modificación
+        # Layout principal
         self.layout = QVBoxLayout()
         self.layout.setContentsMargins(50, 50, 50, 50)
 
-        # Campos de entrada pre-llenados con los datos del producto
+        # Layout para formulario (etiquetas + inputs)
+        form_layout = QFormLayout()
+
+        # Crear los campos de entrada con sus etiquetas
         self.input_id = QLineEdit(self.producto[0])
         self.input_nombre = QLineEdit(self.producto[1])
         self.input_stock = QLineEdit(self.producto[2])
         self.input_precio = QLineEdit(self.producto[3])
+
+        # Agregar etiquetas e inputs al formulario
+        form_layout.addRow(QLabel("ID del Producto:"), self.input_id)
+        form_layout.addRow(QLabel("Nombre:"), self.input_nombre)
+        form_layout.addRow(QLabel("Stock:"), self.input_stock)
+        form_layout.addRow(QLabel("Precio:"), self.input_precio)
+
+        for input_box in [self.input_id, self.input_nombre, self.input_precio, self.input_stock]:
+            input_box.setFont(QFont("Arial", 15))  # Aumentar tamaño de fuente
+            input_box.setFixedSize(200, 40)  # Ajustar tamaño de los inputs
+            input_box.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Centrar texto
 
         # Botón para guardar cambios
         self.boton_guardar = QPushButton("Guardar Cambios")
         self.boton_guardar.setStyleSheet("background-color: lightgreen; color: black;")
         self.boton_guardar.clicked.connect(self.guardar_cambios)
 
-        # Añadir los elementos al layout
-        self.layout.addWidget(self.input_id)
-        self.layout.addWidget(self.input_nombre)
-        self.layout.addWidget(self.input_stock)
-        self.layout.addWidget(self.input_precio)
+        # Agregar todo al layout principal
+        self.layout.addLayout(form_layout)
         self.layout.addWidget(self.boton_guardar)
-
         self.setLayout(self.layout)
 
     def guardar_cambios(self):
@@ -519,8 +539,9 @@ class Venta(QWidget):
 
 class VentanaPrincipal(QWidget):
     """Clase para la ventana principal del programa"""
-    def __init__(self):
+    def __init__(self, usuario):
         super().__init__()
+        self.usuario = usuario
         self.setWindowTitle("Menú Principal")
         self.setStyleSheet("background-color: white; color: black;")
 
@@ -529,7 +550,7 @@ class VentanaPrincipal(QWidget):
 
         # Crear el QStackedLayout con las diferentes pantallas para simular tabulación
         self.stack_layout = QStackedLayout()
-        self.pantalla_inventario = Inventario(self.tabla)
+        self.pantalla_inventario = Inventario(self.tabla, usuario)
         self.pantalla_codigo = InputCodigo()
         self.pantalla_venta = Venta(self.tabla)  # Pasar la tabla a la venta
         self.stack_layout.addWidget(self.pantalla_inventario)  # Index 0 -> Inventario
@@ -541,7 +562,7 @@ class VentanaPrincipal(QWidget):
         self.stack_container.setLayout(self.stack_layout)
 
         # Crear los botones y pasar el stack_layout para controlar las vistas
-        self.botones = Botones(self.stack_layout)
+        self.botones = Botones(self.stack_layout, usuario)
         self.botones.setMaximumWidth(200)
 
         # Layout principal
@@ -556,8 +577,11 @@ class VentanaPrincipal(QWidget):
         self.setLayout(layout_principal)
 #print
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    ventana = VentanaPrincipal()
+def main(usuario):
+    ventana = VentanaPrincipal(usuario)
     ventana.show()
-    sys.exit(app.exec())
+    return ventana
+
+if __name__ == "__main__":
+    usuario = "admn"
+    main(usuario)
