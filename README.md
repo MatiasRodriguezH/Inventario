@@ -2,7 +2,15 @@ Inventario y Ventas - Botillería
 
 Este es un sistema de gestión de inventario y ventas desarrollado en Python utilizando PyQt6. Permite administrar productos, registrar ventas y generar informes.
 
+** COMO EJECUTAR **
+
 Para ejecutar, correr autenticador.py
+- ADMIN:
+usuario: admn
+contraseña: mistral
+- EMPLEADO:
+usuario: usr1
+contraseña: gomita
 
 Características
 
