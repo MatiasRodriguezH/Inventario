@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt
 
 class Botones(QWidget):
     """Clase del Layout de botones principales"""
-    def __init__(self, stack_layout, usuario):
+    def __init__(self, stack_layout, dinero):
         super().__init__()
         self.stack_layout = stack_layout
 
@@ -22,7 +22,7 @@ class Botones(QWidget):
         self.boton_inventario.setStyleSheet("background-color: yellow; color: black;")
         self.boton_inventario.clicked.connect(lambda: self.stack_layout.setCurrentIndex(0))
 
-        self.boton_ganancias = QPushButton(f"{usuario}")
+        self.boton_ganancias = QPushButton(f"Pedido")
         self.boton_ganancias.setStyleSheet("background-color: pink; color: black;")
 
         # Ajustar fuente y hacer los botones responsivos
@@ -37,6 +37,7 @@ class Botones(QWidget):
         self.layout.addWidget(self.boton_venta)
         self.layout.addWidget(self.boton_inventario)
         self.layout.addWidget(self.boton_ganancias)
+        self.layout.addWidget(dinero)
         self.layout.addStretch()
         # -- TO DO --
         #self.setAutoFillBackground(True)                   
@@ -375,10 +376,11 @@ class InputCodigo(QWidget):
 
 class Venta(QWidget):
     """Layout principal de la venta"""
-    def __init__(self, tabla):
+    def __init__(self, tabla, dinero):
         super().__init__()
 
         self.tabla = tabla  # Asegúrate de que está sea la unica insatancia de la tabla
+        self.dinero = dinero # Instancia de Dinero
         
         # Layout principal
         self.layout = QVBoxLayout()
@@ -521,6 +523,9 @@ class Venta(QWidget):
         self.carrito.setRowCount(0)
         self.total_label.setText("Total: $0.00")
 
+        # Agregar el dinero a la caja
+        self.dinero.actualizar_dinero()
+
         QMessageBox.information(self, "Venta completada", "La venta se ha registrado correctamente.")
         
 
@@ -536,23 +541,59 @@ class Venta(QWidget):
         # Actualizar el texto del total en la etiqueta
         self.total_label.setText(f"Total: ${total:.2f}")
 
+class Dinero(QWidget):
+    """Clase para mostrar el dinero total en caja y guardado"""
+    def __init__(self):
+        super().__init__()
+
+        self.dinero_caja = 0.0  # Dinero en la caja
+        self.dinero_guardado = 0.0  # Dinero guardado
+
+        self.layout = QVBoxLayout()
+
+        self.label_caja = QLabel(f"Dinero en caja:")
+        self.label_caja.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+
+        self.label_caja_dinero = QLabel(f"${self.dinero_caja:.2f}")
+        self.label_caja_dinero.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+
+        self.label_guardado = QLabel(f"Dinero guardado:")
+        self.label_guardado.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+
+        self.label_guardado_dinero = QLabel(f"${self.dinero_guardado:.2f}")
+        self.label_guardado_dinero.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+
+        self.layout.addWidget(self.label_caja)
+        self.layout.addWidget(self.label_caja_dinero)
+        self.layout.addWidget(self.label_guardado)
+        self.layout.addWidget(self.label_guardado_dinero)
+        self.setLayout(self.layout)
+
+    def actualizar_dinero(self, monto):
+        """Añade dinero a la caja y actualiza los labels"""
+        self.dinero_caja += monto
+        self.label_caja.setText(f"Dinero en caja: ${self.dinero_caja:.2f}")
 
 class VentanaPrincipal(QWidget):
     """Clase para la ventana principal del programa"""
     def __init__(self, usuario):
         super().__init__()
         self.usuario = usuario
-        self.setWindowTitle("Menú Principal")
+        if self.usuario == "admn":
+            self.setWindowTitle("Menú Principal - Administrador")
+        else:
+            self.setWindowTitle("Menú Principal - Empleado")
         self.setStyleSheet("background-color: white; color: black;")
 
         # Crear la instancia de la tabla (ÚNICA INSTANCIA!!)
         self.tabla = Tabla()
+        self.dinero = Dinero()
 
         # Crear el QStackedLayout con las diferentes pantallas para simular tabulación
         self.stack_layout = QStackedLayout()
         self.pantalla_inventario = Inventario(self.tabla, usuario)
         self.pantalla_codigo = InputCodigo()
-        self.pantalla_venta = Venta(self.tabla)  # Pasar la tabla a la venta
+        self.pantalla_venta = Venta(self.tabla, self.dinero)  # Pasar la tabla a la venta
         self.stack_layout.addWidget(self.pantalla_inventario)  # Index 0 -> Inventario
         self.stack_layout.addWidget(self.pantalla_codigo)  # Index 1 -> Input Código  (CAMBIAR)
         self.stack_layout.addWidget(self.pantalla_venta)  # Index 2 -> Venta
@@ -562,13 +603,13 @@ class VentanaPrincipal(QWidget):
         self.stack_container.setLayout(self.stack_layout)
 
         # Crear los botones y pasar el stack_layout para controlar las vistas
-        self.botones = Botones(self.stack_layout, usuario)
-        self.botones.setMaximumWidth(200)
+        self.botones = Botones(self.stack_layout, self.dinero)
+        self.botones.setMaximumWidth(260)
 
         # Layout principal
         layout_principal = QHBoxLayout()
         layout_principal.setContentsMargins(20, 20, 20, 20)
-        layout_principal.setSpacing(10)
+        layout_principal.setSpacing(5)
         layout_principal.addWidget(self.botones)
         layout_principal.addWidget(self.stack_container)
         layout_principal.setStretchFactor(self.botones, 1)
@@ -584,4 +625,7 @@ def main(usuario):
 
 if __name__ == "__main__":
     usuario = "admn"
-    main(usuario)
+    app = QApplication(sys.argv)
+    login = VentanaPrincipal(usuario)
+    login.show()
+    sys.exit(app.exec())
