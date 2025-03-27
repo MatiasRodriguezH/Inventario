@@ -202,7 +202,6 @@ class Tabla(QWidget):
             for product in self.products:
                 file.write(",".join(product) + "\n")
 
-
 class AgregarProducto(QWidget):
     """Clase para el boton de agregar"""
     def __init__(self, tabla):
@@ -278,7 +277,6 @@ class AgregarProducto(QWidget):
             print("Producto guardado correctamente.")
         else:
             print("Todos los campos deben ser completos.")
-
 
 class ModificarProducto(QWidget):
     """Clase para modificar un producto en la tabla."""
@@ -381,6 +379,7 @@ class Venta(QWidget):
 
         self.tabla = tabla  # Asegúrate de que está sea la unica insatancia de la tabla
         self.dinero = dinero # Instancia de Dinero
+        self.venta_total = 0
         
         # Layout principal
         self.layout = QVBoxLayout()
@@ -465,7 +464,7 @@ class Venta(QWidget):
                         self.input_codigo.clear()
 
                         # Actualizar el total
-                        self.actualizar_total()
+                        self.actualizar_total(precio * cantidad)
 
                     else:
                         QMessageBox.warning(self, "Stock insuficiente", "No hay suficiente stock para esta cantidad.")
@@ -488,7 +487,7 @@ class Venta(QWidget):
             self.tabla.guardarArchivos()
 
             # Actualizar el total
-            self.actualizar_total()
+            self.actualizar_total(-(producto_nombre * cantidad))
 
     def terminar_venta(self):
         """Reiniciamos el carrito y actualizamos el inventario"""
@@ -524,30 +523,29 @@ class Venta(QWidget):
         self.total_label.setText("Total: $0.00")
 
         # Agregar el dinero a la caja
-        self.dinero.actualizar_dinero()
+        self.dinero.actualizar_dinero(self.venta_total)
+        self.venta_total = 0
+        
 
         QMessageBox.information(self, "Venta completada", "La venta se ha registrado correctamente.")
         
 
-    
-    def actualizar_total(self):
+    def actualizar_total(self, valor):
         """Actualiza el total de la venta en el QLabel"""
-        total = 0
-        for row in range(self.carrito.rowCount()):
-            cantidad = int(self.carrito.item(row, 1).text())  # Obtener cantidad
-            precio = float(self.carrito.item(row, 2).text().replace('$', '').replace(',', ''))  # Obtener precio
-            total += cantidad * precio  # Calcular el total
+        self.venta_total += valor
 
         # Actualizar el texto del total en la etiqueta
-        self.total_label.setText(f"Total: ${total:.2f}")
+        self.total_label.setText(f"Total: ${self.venta_total:.2f}")
 
 class Dinero(QWidget):
     """Clase para mostrar el dinero total en caja y guardado"""
     def __init__(self):
         super().__init__()
 
-        self.dinero_caja = 0.0  # Dinero en la caja
-        self.dinero_guardado = 0.0  # Dinero guardado
+        self.archivo = "dinero.txt"
+
+        # Cargar dinero desde el archivo
+        self.dinero_caja, self.dinero_guardado = self.cargar_dinero()
 
         self.layout = QVBoxLayout()
 
@@ -557,23 +555,78 @@ class Dinero(QWidget):
         self.label_caja_dinero = QLabel(f"${self.dinero_caja:.2f}")
         self.label_caja_dinero.setFont(QFont("Arial", 18, QFont.Weight.Bold))
 
+        self.boton_retirar = QPushButton("Retirar dinero")
+        self.boton_retirar.setFont(QFont("Arial", 14))
+        self.boton_retirar.clicked.connect(self.retirar_dinero_popup)
+
         self.label_guardado = QLabel(f"Dinero guardado:")
         self.label_guardado.setFont(QFont("Arial", 18, QFont.Weight.Bold))
 
         self.label_guardado_dinero = QLabel(f"${self.dinero_guardado:.2f}")
         self.label_guardado_dinero.setFont(QFont("Arial", 18, QFont.Weight.Bold))
 
+        # Botón para guardar dinero
+        self.boton_guardar = QPushButton("Guardar Dinero")
+        self.boton_guardar.setFont(QFont("Arial", 14))
+        self.boton_guardar.clicked.connect(self.guardar_dinero_popup)
+
         self.layout.addWidget(self.label_caja)
         self.layout.addWidget(self.label_caja_dinero)
+        self.layout.addWidget(self.boton_retirar)
         self.layout.addWidget(self.label_guardado)
         self.layout.addWidget(self.label_guardado_dinero)
+        self.layout.addWidget(self.boton_guardar)
+        
         self.setLayout(self.layout)
 
     def actualizar_dinero(self, monto):
-        """Añade dinero a la caja y actualiza los labels"""
+        """Añade dinero a la caja, actualiza los labels y guarda los datos"""
         self.dinero_caja += monto
-        self.label_caja.setText(f"Dinero en caja: ${self.dinero_caja:.2f}")
+        self.label_caja_dinero.setText(f"${self.dinero_caja:.2f}")
+        self.guardar_dinero()  # Se asegura de guardar cambios
 
+    def retirar_dinero_popup(self):
+        """Abre una ventana emergente para ingresar la cantidad a guardar"""
+        cantidad, ok = QInputDialog.getDouble(self, "Guardar Dinero", "Ingrese la cantidad a guardar:", 0.0, 0.0, self.dinero_guardado, 2)
+
+        if ok and cantidad > 0:
+            self.dinero_caja += cantidad
+            self.dinero_guardado -= cantidad
+
+            self.label_caja_dinero.setText(f"${self.dinero_caja:.2f}")
+            self.label_guardado_dinero.setText(f"${self.dinero_guardado:.2f}")
+
+            self.guardar_dinero()  # Se asegura de guardar cambios
+
+        pass
+
+    def guardar_dinero_popup(self):
+        """Abre una ventana emergente para ingresar la cantidad a guardar"""
+        cantidad, ok = QInputDialog.getDouble(self, "Guardar Dinero", "Ingrese la cantidad a guardar:", 0.0, 0.0, self.dinero_caja, 2)
+        
+        if ok and cantidad > 0:
+            self.dinero_caja -= cantidad
+            self.dinero_guardado += cantidad
+
+            self.label_caja_dinero.setText(f"${self.dinero_caja:.2f}")
+            self.label_guardado_dinero.setText(f"${self.dinero_guardado:.2f}")
+
+            self.guardar_dinero()  # Se asegura de guardar cambios
+
+    def guardar_dinero(self):
+        """Guarda los valores de dinero en un archivo"""
+        with open(self.archivo, "w") as f:
+            f.write(f"{self.dinero_caja:.2f}\n{self.dinero_guardado:.2f}")
+
+    def cargar_dinero(self):
+        """Carga los valores de dinero desde un archivo"""
+        try:
+            with open(self.archivo, "r") as f:
+                valores = f.readlines()
+                return float(valores[0]), float(valores[1])
+        except (FileNotFoundError, IndexError, ValueError):
+            return 0.0, 0.0  # Si hay un error, inicializa en 0
+            
 class VentanaPrincipal(QWidget):
     """Clase para la ventana principal del programa"""
     def __init__(self, usuario):
@@ -616,7 +669,6 @@ class VentanaPrincipal(QWidget):
         layout_principal.setStretchFactor(self.stack_container, 4)
 
         self.setLayout(layout_principal)
-#print
 
 def main(usuario):
     ventana = VentanaPrincipal(usuario)
