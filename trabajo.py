@@ -2,7 +2,8 @@ import sys
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, 
     QHBoxLayout, QTableWidget, QTableWidgetItem, QSizePolicy, 
-    QHeaderView, QStackedLayout, QLabel, QLineEdit, QMessageBox, QInputDialog, QFormLayout
+    QHeaderView, QStackedLayout, QLabel, QLineEdit, QMessageBox, QInputDialog, 
+    QFormLayout, QSpinBox, QDialog
 )
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
@@ -22,11 +23,12 @@ class Botones(QWidget):
         self.boton_inventario.setStyleSheet("background-color: yellow; color: black;")
         self.boton_inventario.clicked.connect(lambda: self.stack_layout.setCurrentIndex(0))
 
-        self.boton_ganancias = QPushButton(f"Pedido")
-        self.boton_ganancias.setStyleSheet("background-color: pink; color: black;")
+        self.boton_pedido = QPushButton(f"Pedido")
+        self.boton_pedido.setStyleSheet("background-color: pink; color: black;")
+        self.boton_pedido.clicked.connect(lambda: self.stack_layout.setCurrentIndex(1))
 
         # Ajustar fuente y hacer los botones responsivos
-        for boton in [self.boton_venta, self.boton_inventario, self.boton_ganancias]:
+        for boton in [self.boton_venta, self.boton_inventario, self.boton_pedido]:
             boton.setFont(QFont("Arial", 20, QFont.Weight.Bold))
             boton.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
@@ -36,7 +38,7 @@ class Botones(QWidget):
         self.layout.setSpacing(10)
         self.layout.addWidget(self.boton_venta)
         self.layout.addWidget(self.boton_inventario)
-        self.layout.addWidget(self.boton_ganancias)
+        self.layout.addWidget(self.boton_pedido)
         self.layout.addWidget(dinero)
         self.layout.addStretch()
         # -- TO DO --
@@ -345,32 +347,6 @@ class ModificarProducto(QWidget):
         else:
             QMessageBox.warning(self, "Error", "Todos los campos deben ser completos.")
 
-class InputCodigo(QWidget):
-    """Clase para el input de la venta"""
-    def __init__(self):
-        super().__init__()
-
-        # Crear layout
-        self.layout = QVBoxLayout()
-        self.layout.setContentsMargins(50, 50, 50, 50)
-
-        # Crear el label y el input
-        label = QLabel("Ingrese Código:")
-        label.setFont(QFont("Arial", 24, QFont.Weight.Bold))  # Texto más grande
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Centrar el texto
-
-        self.input_codigo = QLineEdit()
-        self.input_codigo.setFont(QFont("Arial", 30))  # Hacer el input más grande
-        self.input_codigo.setFixedSize(400, 80)  # Ajustar tamaño del input
-        self.input_codigo.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Centrar texto dentro del input
-
-        # Agregar los elementos al layout
-        self.layout.addStretch()
-        self.layout.addWidget(label)
-        self.layout.addWidget(self.input_codigo, alignment=Qt.AlignmentFlag.AlignCenter)  # Centrar input
-        self.layout.addStretch()  # Espaciador inferior
-
-        self.setLayout(self.layout)
 
 class Venta(QWidget):
     """Layout principal de la venta"""
@@ -408,10 +384,12 @@ class Venta(QWidget):
         # Crear botones
         self.boton_eliminar = QPushButton("Eliminar item")
         self.boton_eliminar.setStyleSheet("background-color: lightcoral; color: black;")
+        self.boton_eliminar.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         self.boton_eliminar.clicked.connect(self.eliminar_del_carrito)
 
         self.boton_terminar = QPushButton("Terminar venta")
         self.boton_terminar.setStyleSheet("background-color: lightgreen; color: black;")
+        self.boton_terminar.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         self.boton_terminar.clicked.connect(self.terminar_venta)
 
         # Crear un QHBoxLayout para el input de código y el total
@@ -479,15 +457,21 @@ class Venta(QWidget):
         if fila != -1:  # Si hay una fila seleccionada
             producto_nombre = self.carrito.item(fila, 0).text()
             cantidad = int(self.carrito.item(fila, 1).text())
-
+            for product in self.tabla.products:
+                if product[1] == producto_nombre:
+                    precio = product[3]
+                    break
             # Eliminar la fila del carrito
             self.carrito.removeRow(fila)
 
             # Guardar los cambios en el archivo
             self.tabla.guardarArchivos()
 
+            print(precio)
+            print(cantidad)
+
             # Actualizar el total
-            self.actualizar_total(-(producto_nombre * cantidad))
+            self.actualizar_total(-(int(precio) * int(cantidad)))
 
     def terminar_venta(self):
         """Reiniciamos el carrito y actualizamos el inventario"""
@@ -587,18 +571,14 @@ class Dinero(QWidget):
 
     def retirar_dinero_popup(self):
         """Abre una ventana emergente para ingresar la cantidad a guardar"""
-        cantidad, ok = QInputDialog.getDouble(self, "Guardar Dinero", "Ingrese la cantidad a guardar:", 0.0, 0.0, self.dinero_guardado, 2)
+        cantidad, ok = QInputDialog.getDouble(self, "Retirar Dinero", "Ingrese la cantidad a retirar:", 0.0, 0.0, self.dinero_guardado, 2)
 
         if ok and cantidad > 0:
             self.dinero_caja += cantidad
             self.dinero_guardado -= cantidad
-
             self.label_caja_dinero.setText(f"${self.dinero_caja:.2f}")
             self.label_guardado_dinero.setText(f"${self.dinero_guardado:.2f}")
-
             self.guardar_dinero()  # Se asegura de guardar cambios
-
-        pass
 
     def guardar_dinero_popup(self):
         """Abre una ventana emergente para ingresar la cantidad a guardar"""
@@ -626,7 +606,151 @@ class Dinero(QWidget):
                 return float(valores[0]), float(valores[1])
         except (FileNotFoundError, IndexError, ValueError):
             return 0.0, 0.0  # Si hay un error, inicializa en 0
-            
+
+class Pedido(QWidget):
+    def __init__(self, usuario, tabla):
+        super().__init__()
+        self.usuario = usuario
+        self.tabla_inventario = tabla  # Guardamos la referencia a tabla para buscar productos
+        self.productos = []  # Lista de productos en el pedido
+
+        # Tabla de pedido
+        self.tabla = QTableWidget(0, 2)
+        self.tabla.setHorizontalHeaderLabels(["Nombre", "Cantidad"])
+        self.tabla.setStyleSheet("background-color: lightgray; color: black;")
+        self.tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.tabla.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+
+        # Layout de botones
+        self.layout_botones = QVBoxLayout()
+
+        # Botón para agregar producto
+        self.boton_agregar = QPushButton("Agregar item")
+        self.boton_agregar.setStyleSheet("background-color: pink; color: black;")
+        self.boton_agregar.setFont(QFont("Arial", 20, QFont.Weight.Bold))
+        self.boton_agregar.setMinimumHeight(70)
+        self.boton_agregar.clicked.connect(self.mostrar_ventana_codigo)  # Conectar a la ventana emergente
+        self.layout_botones.addWidget(self.boton_agregar)
+
+        # Botón para eliminar producto
+        self.boton_eliminar = QPushButton("Eliminar item")
+        self.boton_eliminar.setStyleSheet("background-color: lightcoral; color: black;")
+        self.boton_eliminar.setFont(QFont("Arial", 20, QFont.Weight.Bold))
+        self.boton_eliminar.setMinimumHeight(70)
+        self.boton_eliminar.clicked.connect(self.eliminar_producto)
+        self.layout_botones.addWidget(self.boton_eliminar)
+
+        # Botón para finalizar pedido
+        self.boton_terminar = QPushButton("Finalizar pedido")
+        self.boton_terminar.setStyleSheet("background-color: lightcoral; color: black;")
+        self.boton_terminar.setFont(QFont("Arial", 20, QFont.Weight.Bold))
+        self.boton_terminar.setMinimumHeight(70)
+        self.boton_terminar.clicked.connect(self.terminar_pedido)
+        self.layout_botones.addWidget(self.boton_terminar)
+
+        self.layout_botones.addStretch()
+
+        # Layout principal
+        self.layout_inventario = QHBoxLayout()
+        self.layout_inventario.addWidget(self.tabla)
+        self.layout_inventario.addLayout(self.layout_botones)
+        self.setLayout(self.layout_inventario)
+
+    def mostrar_ventana_codigo(self):
+        """Muestra una ventana emergente para ingresar el código del producto."""
+        ventana = QDialog(self)
+        ventana.setWindowTitle("Ingresar código del producto")
+        layout = QFormLayout()
+
+        # Campo para ingresar código del producto
+        input_codigo = QLineEdit()
+        input_codigo.setPlaceholderText("Ingrese el código")
+        layout.addRow("Código:", input_codigo)
+
+        # Botón para confirmar
+        boton_confirmar = QPushButton("Buscar producto")
+        boton_confirmar.clicked.connect(lambda: self.buscar_producto(input_codigo.text(), ventana))
+        layout.addRow(boton_confirmar)
+
+        ventana.setLayout(layout)
+        ventana.exec()  # Mostrar ventana de forma modal
+
+    def buscar_producto(self, codigo, ventana):
+        """Busca el código en la tabla de inventario y muestra la ventana de cantidad si lo encuentra."""
+        producto_encontrado = None
+        for producto in self.tabla_inventario.products:
+            if producto[0] == codigo:  # Comparar el código
+                producto_encontrado = producto
+                break
+
+        if producto_encontrado:
+            nombre, precio = producto_encontrado[1], producto_encontrado[3]  # Nombre y precio del producto
+            ventana.accept()  # Cerrar la ventana de código
+            self.mostrar_ventana_cantidad(nombre, precio)
+        else:
+            # Mostrar un mensaje de error si el código no existe
+            QMessageBox.warning(self, "Error", "Código de producto no encontrado.", QMessageBox.StandardButton.Ok)
+
+    def mostrar_ventana_cantidad(self, nombre_producto, precio):
+        """Ventana emergente para ingresar la cantidad del producto."""
+        ventana = QDialog(self)
+        ventana.setWindowTitle(f"Cantidad de {nombre_producto}")
+        layout = QFormLayout()
+
+        # Etiqueta con la información del producto
+        label_info = QLabel(f"Producto: {nombre_producto}\nPrecio: ${precio}")
+        layout.addRow(label_info)
+
+        # Campo para ingresar cantidad
+        input_cantidad = QSpinBox()
+        input_cantidad.setMinimum(1)
+        input_cantidad.setMaximum(100)
+        layout.addRow("Cantidad:", input_cantidad)
+
+        # Botón para confirmar
+        boton_confirmar = QPushButton("Agregar")
+        boton_confirmar.clicked.connect(lambda: self.agregar_producto(nombre_producto, input_cantidad.value(), ventana))
+        layout.addRow(boton_confirmar)
+
+        ventana.setLayout(layout)
+        ventana.exec()
+
+    def agregar_producto(self, nombre, cantidad, ventana):
+        """Agrega el producto a la lista y la tabla."""
+        self.productos.append((nombre, str(cantidad)))
+        self.actualizarTabla()
+        ventana.accept()
+
+    def actualizarTabla(self):
+        """Llena la tabla con los datos de los productos."""
+        self.tabla.setRowCount(0)  # Eliminar todas las filas actuales
+        for row, product in enumerate(self.productos):
+            self.tabla.insertRow(row)
+            for col, value in enumerate(product):
+                self.tabla.setItem(row, col, QTableWidgetItem(value))
+
+    def eliminar_producto(self):
+        """Elimina el producto seleccionado de la tabla y de la lista de productos."""
+        fila_seleccionada = self.tabla.currentRow()
+        if fila_seleccionada != -1:
+            self.productos.pop(fila_seleccionada)
+            self.tabla.removeRow(fila_seleccionada)
+
+    def terminar_pedido(self):
+        for producto in self.productos:
+            for item in self.tabla_inventario.products:
+                if producto[0] == item[1]:
+                    item[2] = (str(int(item[2]) + int(producto[1])))
+                    self.tabla_inventario.guardarArchivos()
+                    self.tabla_inventario.actualizarTabla()
+                    break
+
+        #for producto in self.productos:
+        #    pass
+        #for item in self.tabla_inventario.products:
+        #    print(item)
+        pass
+
 class VentanaPrincipal(QWidget):
     """Clase para la ventana principal del programa"""
     def __init__(self, usuario):
@@ -645,10 +769,10 @@ class VentanaPrincipal(QWidget):
         # Crear el QStackedLayout con las diferentes pantallas para simular tabulación
         self.stack_layout = QStackedLayout()
         self.pantalla_inventario = Inventario(self.tabla, usuario)
-        self.pantalla_codigo = InputCodigo()
         self.pantalla_venta = Venta(self.tabla, self.dinero)  # Pasar la tabla a la venta
+        self.pantalla_pedido = Pedido(usuario, self.tabla)
         self.stack_layout.addWidget(self.pantalla_inventario)  # Index 0 -> Inventario
-        self.stack_layout.addWidget(self.pantalla_codigo)  # Index 1 -> Input Código  (CAMBIAR)
+        self.stack_layout.addWidget(self.pantalla_pedido)  # Index 1 -> Input Código  (CAMBIAR)
         self.stack_layout.addWidget(self.pantalla_venta)  # Index 2 -> Venta
 
         # Crear el contenedor para el stack
